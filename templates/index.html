@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Pneumonia Predictor</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the Inter font and overall aesthetics */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* Light background */
+        }
+        .card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+        }
+        /* Custom file input appearance */
+        #imageUpload {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Application Container -->
+    <div id="appContainer" class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl card transition-all duration-300">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-800 tracking-tight mb-2 md:text-4xl">
+                🩺 AI Chest X-Ray Analyzer
+            </h1>
+            <p class="text-gray-500 text-lg">Predicting Pneumonia with X-Ray Image.</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="mb-8 p-6 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-50 hover:border-indigo-500 transition-colors duration-300">
+            <div class="flex flex-col items-center">
+                <!-- SVG Icon for Upload -->
+                <svg class="w-12 h-12 text-indigo-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v2a3 3 0 00-3-3H9a3 3 0 00-3 3v2a3 3 0 003 3h7m-7-7h7m-7 0a3 3 0 00-3-3m3 3h-2m-2 0a3 3 0 00-3-3m3 3z"></path></svg>
+                <p class="text-lg text-gray-600 mb-4">
+                    Drag and drop a chest X-Ray image here, or
+                </p>
+                <label for="imageUpload" class="cursor-pointer bg-indigo-600 text-white font-semibold py-2 px-6 rounded-full shadow-lg hover:bg-indigo-700 transition-all duration-300 transform hover:scale-105">
+                    Browse Files
+                </label>
+                <input type="file" id="imageUpload" accept="image/*" onchange="previewImage(event)">
+            </div>
+        </section>
+
+        <!-- Preview and Results Section -->
+        <div class="md:flex md:space-x-8">
+            
+            <!-- Image Preview Column -->
+            <div class="md:w-1/2 mb-6 md:mb-0">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b pb-2">Image Preview</h2>
+                <div id="imagePlaceholder" class="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm overflow-hidden border border-gray-300">
+                    Your X-Ray image will appear here.
+                </div>
+                <!-- max-h-96 and object-contain ensure large images scale down gracefully -->
+                <img id="imagePreview" class="hidden w-full h-auto max-h-96 object-contain rounded-lg mt-0" alt="X-Ray Preview">
+                
+                <button id="analyzeBtn" onclick="analyzeImage()" class="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg mt-6 shadow-md hover:bg-green-600 transition-colors duration-300 disabled:opacity-50" disabled>
+                    Analyze X-Ray
+                </button>
+            </div>
+
+            <!-- Results Column -->
+            <div class="md:w-1/2">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b pb-2">Prediction Results</h2>
+                
+                <div id="loadingIndicator" class="hidden flex items-center space-x-3 p-4 bg-yellow-100 text-yellow-800 rounded-lg">
+                    <svg class="animate-spin h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>Running prediction on the backend...</span>
+                </div>
+
+                <div id="resultContainer" class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200">
+                    <p class="text-gray-500 text-sm">
+                        Prediction will appear here after analysis.
+                    </p>
+                    <div id="predictionOutput" class="mt-4 text-center">
+                        <!-- Dynamic content for prediction and probability -->
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-red-100 text-red-800 rounded-lg shadow-sm">
+                    <p class="font-bold">⚠️ Medical Disclaimer</p>
+                    <p class="text-sm">This AI model is for educational and experimental purposes only. It is NOT a substitute for professional medical advice, diagnosis, or treatment.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for Frontend Logic -->
+    <script>
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePlaceholder = document.getElementById('imagePlaceholder');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const predictionOutput = document.getElementById('predictionOutput');
+        let selectedFile = null;
+
+        /**
+         * Previews the selected image and enables the Analyze button.
+         */
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.classList.remove('hidden');
+                    imagePlaceholder.classList.add('hidden');
+                    analyzeBtn.disabled = false;
+                };
+                reader.readAsDataURL(file);
+                
+                // Clear previous results
+                predictionOutput.innerHTML = '';
+            } else {
+                imagePreview.classList.add('hidden');
+                imagePlaceholder.classList.remove('hidden');
+                analyzeBtn.disabled = true;
+                selectedFile = null;
+            }
+        }
+
+        /**
+         * Handles the API call to the Flask backend for image analysis.
+         */
+        async function analyzeImage() {
+            if (!selectedFile) {
+                displayMessage("Please upload an X-Ray image first.", "alert");
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            predictionOutput.innerHTML = ''; // Clear old results
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            // API_ENDPOINT matches the Flask server running on http://127.0.0.1:5000/predict
+            const API_ENDPOINT = 'http://127.0.0.1:5000/predict';
+
+            try {
+                // Fetch call to the running Python server
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    // Handle HTTP error codes (4xx, 5xx) returned by the Flask app
+                    const errorText = await response.text();
+                    const errorDetail = errorText.length > 100 ? errorText.substring(0, 100) + '...' : errorText;
+                    throw new Error(`API Error: ${response.status} ${response.statusText}. Details: ${errorDetail}`);
+                }
+
+                const result = await response.json();
+                displayPrediction(result);
+
+            } catch (error) {
+                console.error('Prediction failed:', error);
+                
+                // Check for "Failed to fetch" (network/CORS/server-not-running error)
+                if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                     displayMessage(
+                        `Connection Error: Could not reach the model server at ${API_ENDPOINT}. 
+                         Please ensure your Python backend (app.py) is running on port 5000.`, 
+                        "error"
+                    );
+                } else {
+                     displayMessage(`An unexpected error occurred: ${error.message}`, "error");
+                }
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Formats and displays the prediction result in the output container.
+         */
+        function displayPrediction(result) {
+            const { prediction, probability } = result;
+            // Format probability as a percentage string
+            const probability_percent = (probability * 100).toFixed(2);
+            let resultClass, resultColor, resultIcon;
+
+            // Define styling based on the prediction
+            if (prediction === 'PNEUMONIA') {
+                resultClass = 'bg-red-500 text-white';
+                resultColor = 'text-red-600';
+                resultIcon = '🚨';
+            } else {
+                resultClass = 'bg-green-500 text-white';
+                resultColor = 'text-green-600';
+                resultIcon = '✅';
+            }
+            
+            predictionOutput.innerHTML = `
+                <div class="p-4 ${resultClass} rounded-lg shadow-xl mb-4 transform scale-100 transition-transform duration-500 hover:scale-[1.02]">
+                    <p class="text-2xl font-bold">${resultIcon} Predicted: ${prediction}</p>
+                </div>
+                <p class="text-lg font-semibold ${resultColor}">Confidence: <span class="text-gray-800">${probability_percent}%</span></p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div class="h-2.5 rounded-full ${resultClass}" style="width: ${probability_percent}%"></div>
+                </div>
+            `;
+            // Scroll to the result container for better visibility on small screens
+            document.getElementById('resultContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        /**
+         * Displays a temporary, custom message box (used instead of alert()).
+         */
+        function displayMessage(message, type) {
+            let bgColor = 'bg-red-600';
+            if (type === 'alert') bgColor = 'bg-yellow-600'; // Using red for all critical errors/alerts
+            if (type === 'error') bgColor = 'bg-red-700';
+
+            const messageHtml = `
+                <div id="custom-message" class="fixed top-0 left-0 right-0 p-4 text-center text-white font-bold ${bgColor} z-50 shadow-lg">
+                    ${message}
+                    <button class="ml-4 text-sm font-semibold hover:text-gray-200" onclick="document.getElementById('custom-message').remove()">
+                        (Dismiss)
+                    </button>
+                </div>
+            `;
+            // Remove any existing message before adding a new one
+            document.getElementById('custom-message')?.remove();
+            document.body.insertAdjacentHTML('afterbegin', messageHtml);
+        }
+
+        // --- Drag and Drop Logic ---
+        const uploadSection = document.querySelector('.p-6.border-2.border-dashed');
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('border-indigo-700', 'bg-indigo-100');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('border-indigo-700', 'bg-indigo-100');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('border-indigo-700', 'bg-indigo-100');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                // Set files on the hidden input and trigger the change event
+                const fileInput = document.getElementById('imageUpload');
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+
+</body>
+</html>
